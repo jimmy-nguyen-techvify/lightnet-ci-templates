@@ -12,7 +12,7 @@ on:
 
 jobs:
   call-template:
-    uses: Lightnet-Group/lightnet-ci-templates/.github/workflows/build-deploy-aca.yml@main
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/build-deploy-aca.yml@main
     with:
       service_name: iremit-admin
       container_rg_name: tf-lightnet-stg-container
