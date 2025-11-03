@@ -1,0 +1,133 @@
+name: Build, Push & Deploy to ACA (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "Service name (e.g. iremit-admin)"
+        required: true
+        type: string
+      container_rg_name:
+        description: "Resource group of container app"
+        required: true
+        type: string
+      registry_dev:
+        description: "ACR name for DEV"
+        required: true
+        type: string
+      registry_stg:
+        description: "ACR name for STG"
+        required: true
+        type: string
+      registry_prod:
+        description: "ACR name for PROD"
+        required: true
+        type: string
+      custom_tag:
+        description: "Custom tag (optional, e.g. hotfix-001)"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+
+jobs:
+  build-and-deploy-aca:
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]')
+      && !contains(github.event.head_commit.message, 'ci:')
+    name: Build, Push & Deploy to ACA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate semantic version
+        if: github.ref_name == 'main'
+        id: semver
+        uses: lukaszraczylo/semver-generator@v1
+        with:
+          config_file: semver.yaml
+          repository_local: true
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          CUSTOM_TAG="${{ inputs.custom_tag }}"
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+
+          case "${GITHUB_REF_NAME}" in
+            develop)
+              ENVIRONMENT="dev"
+              REGISTRY_NAME="${{ inputs.registry_dev }}"
+              TAG="${CUSTOM_TAG:-dev-${SHORT_SHA}}"
+              ;;
+            beta)
+              ENVIRONMENT="stg"
+              REGISTRY_NAME="${{ inputs.registry_stg }}"
+              TAG="${CUSTOM_TAG:-stg-${SHORT_SHA}}"
+              ;;
+            main)
+              ENVIRONMENT="prod"
+              REGISTRY_NAME="${{ inputs.registry_prod }}"
+              TAG="${CUSTOM_TAG:-v${{ steps.semver.outputs.semantic_version }}}"
+              ;;
+            *)
+              ENVIRONMENT="unknown"
+              REGISTRY_NAME="none"
+              TAG="build-${SHORT_SHA}"
+              ;;
+          esac
+
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+          echo "REGISTRY_NAME=$REGISTRY_NAME" >> $GITHUB_ENV
+
+          echo "🏷️ $ENVIRONMENT | 📦 $REGISTRY_NAME | 🔖 $TAG"
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and Push Image
+        run: |
+          ACR_NAME=$(echo "${REGISTRY_NAME}" | cut -d'.' -f1)
+          echo "🚀 Starting build for ${{ inputs.service_name }}"
+          echo "📦 Registry: ${REGISTRY_NAME}"
+          echo "🏷️ Tag: ${TAG}"
+          echo "🧱 ACR Name: ${ACR_NAME}"
+          echo "----------------------------------------"
+
+          az acr build \
+            --registry ${ACR_NAME} \
+            --image ${REGISTRY_NAME}/${{ inputs.service_name }}:${TAG} \
+            --image ${REGISTRY_NAME}/${{ inputs.service_name }}:latest \
+            -f Dockerfile .
+
+          echo "✅ Image pushed: ${REGISTRY_NAME}/${{ inputs.service_name }}:${TAG}"
+          echo "✅ Image pushed: ${REGISTRY_NAME}/${{ inputs.service_name }}:latest"
+
+      - name: Create new ACA revision
+        run: |
+          REV_NAME="rev-github-actions-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+
+          echo "🚀 Starting ACA revision deployment..."
+          echo "🌍 Environment: ${ENVIRONMENT}"
+          echo "📦 Service: ${{ inputs.service_name }}"
+          echo "🏗️ Resource Group: ${{ inputs.container_rg_name }}"
+          echo "🖼️ Image: ${REGISTRY_NAME}/${{ inputs.service_name }}:${TAG}"
+          echo "🔖 Revision Name: ${REV_NAME}"
+          echo "----------------------------------------"
+
+          az containerapp update \
+            --name ${{ inputs.service_name }}-${ENVIRONMENT} \
+            --resource-group ${{ inputs.container_rg_name }} \
+            --image ${REGISTRY_NAME}/${{ inputs.service_name }}:${TAG} \
+            --revision-suffix ${REV_NAME}
+
+          echo "✅ Successfully created new ACA revision"
+          echo "🆕 Revision: ${REV_NAME}"

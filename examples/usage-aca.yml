@@ -1,0 +1,24 @@
+name: Build, Push & Deploy to ACA via Template
+
+on:
+  push:
+    branches: [ develop, beta, main ]
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: "Custom tag (optional, e.g. hotfix-001)"
+        required: false
+        default: ""
+
+jobs:
+  call-template:
+    uses: Lightnet-Group/lightnet-ci-templates/.github/workflows/build-deploy-aca.yml@main
+    with:
+      service_name: iremit-admin
+      container_rg_name: tf-lightnet-stg-container
+      registry_dev: tflightnetdevacr.azurecr.io
+      registry_stg: tflightnetstgacr.azurecr.io
+      registry_prod: tflightnetprodacr.azurecr.io
+      custom_tag: ${{ github.event.inputs.custom_tag }}
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}

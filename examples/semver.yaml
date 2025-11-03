@@ -1,0 +1,25 @@
+version: 1.0.0
+versioning:
+  dev_branch: develop
+  release_branch: main
+  tag_prefix: v
+  auto_mode: true
+  
+# Commit message patterns for version bumping
+patterns:
+  major:
+    - "BREAKING CHANGE:"
+    - "!:"
+  minor:
+    - "feat:"
+    - "feature:"
+  patch:
+    - "fix:"
+    - "bugfix:"
+    - "patch:"
+    - "chore:"
+    - "docs:"
+    - "style:"
+    - "refactor:"
+    - "perf:"
+    - "test:"
