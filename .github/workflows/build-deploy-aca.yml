@@ -113,7 +113,7 @@ jobs:
 
       - name: Create new ACA revision
         run: |
-          REV_NAME="rev-github-actions-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          REV_NAME="rev-github-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
 
           echo "🚀 Starting ACA revision deployment..."
           echo "🌍 Environment: ${ENVIRONMENT}"
