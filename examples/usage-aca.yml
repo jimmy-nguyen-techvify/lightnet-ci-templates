@@ -2,7 +2,14 @@ name: Build, Push & Deploy to ACA via Template
 
 on:
   push:
-    branches: [ develop, beta, main ]
+    branches:
+      - develop
+      - beta
+      - main
+    paths-ignore:
+      - '.github/**'
+      - 'ci/**'
+
   workflow_dispatch:
     inputs:
       custom_tag:
