@@ -1,0 +1,114 @@
+name: NuGet Dependency Check
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'Project name for DefectDojo'
+        required: true
+        type: string
+      scan_path:
+        description: 'Path to scan for dependencies'
+        required: false
+        type: string
+        default: './'
+      dojo_url:
+        description: 'DefectDojo URL'
+        required: false
+        type: string
+        default: 'https://dojo.devfocus.site/'
+      product_type:
+        description: 'DefectDojo product type'
+        required: false
+        type: string
+        default: 'Web Application'
+    secrets:
+      DOJO_USERNAME:
+        description: 'DefectDojo username'
+        required: true
+      DOJO_PASSWORD:
+        description: 'DefectDojo password'
+        required: true
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+
+    env:
+      SCAN_TYPE: "Dependency Check Scan"
+      PROJECT_NAME: ${{ inputs.project_name }}
+      DOJO_URL: ${{ inputs.dojo_url }}
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Define scan variables
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            ENVIRONMENT_TYPE="Production"
+          elif [[ "${GITHUB_REF_NAME}" == "beta" ]]; then
+            ENVIRONMENT_TYPE="Staging"
+          elif [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
+            ENVIRONMENT_TYPE="Development"
+          else
+            ENVIRONMENT_TYPE="Unknown"
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            ENGAGEMENT_NAME="Weekly Dependency Check Scan [${GITHUB_REF_NAME}]"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            ENGAGEMENT_NAME="PR Dependency Check Scan [${GITHUB_HEAD_REF}]"
+          else
+            ENGAGEMENT_NAME="Dependency Check Scan [${GITHUB_REF_NAME}]"
+          fi
+
+          echo "ENVIRONMENT_TYPE=$ENVIRONMENT_TYPE" >> $GITHUB_ENV
+          echo "ENGAGEMENT_NAME=$ENGAGEMENT_NAME" >> $GITHUB_ENV
+
+      - name: Cache Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check-data
+          key: dependency-check-data-${{ runner.os }}
+          restore-keys: dependency-check-data-
+
+      - name: Create dependency-check.properties
+        run: |
+          cat <<EOF > dependency-check.properties
+          analyzer.assembly.enabled=true
+          analyzer.nugetconf.enabled=true
+          analyzer.node.audit.enabled=false
+          analyzer.node.package.enabled=false
+          analyzer.yarn.audit.enabled=false
+          analyzer.retirejs.enabled=false
+          analyzer.ossindex.enabled=false
+          EOF
+
+      - name: Run OWASP Dependency Check (.NET project)
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: ${{ env.PROJECT_NAME }}
+          path: ${{ inputs.scan_path }}
+          format: XML
+          out: depcheck-report.xml
+          args: >
+            --propertyfile ./dependency-check.properties
+            --noupdate
+
+      - name: Upload Dependency Check report to DefectDojo
+        uses: portswigger-cloud/defectdojo-import-scan@main
+        env:
+          DEFECTDOJO_DEBUG: "true"
+        with:
+          defectdojo-product: ${{ env.PROJECT_NAME }}
+          defectdojo-product-type: ${{ inputs.product_type }}
+          defectdojo-url: ${{ env.DOJO_URL }}
+          defectdojo-username: ${{ env.DOJO_USERNAME }}
+          defectdojo-password: ${{ env.DOJO_PASSWORD }}
+          defectdojo-engagement-name: ${{ env.ENGAGEMENT_NAME }}
+          defectdojo-environment-type: ${{ env.ENVIRONMENT_TYPE }}
+          defectdojo-scan-type: ${{ env.SCAN_TYPE }}
+          scan-results-file-name: "depcheck-report.xml"

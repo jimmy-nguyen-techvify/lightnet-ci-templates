@@ -1,0 +1,49 @@
+name: Complete CI/CD Pipeline with Security
+
+on:
+  push:
+    branches: [main, develop, beta]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Security scans run first
+  dependency-check:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/dependency-check.yml@main
+    with:
+      project_name: "MyApp"
+      scan_path: "./src"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  semgrep-scan:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/semgrep-scan.yml@main
+    with:
+      project_name: "MyApp"
+      semgrep_config: "p/security-audit"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  trivy-scan:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/trivy-scan.yml@main
+    with:
+      project_name: "MyApp"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  # Deploy only after security scans pass
+  deploy:
+    needs: [dependency-check, semgrep-scan, trivy-scan]
+    if: github.event_name == 'push'
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/build-deploy-aca.yml@main
+    with:
+      service_name: "my-app"
+      container_rg_name: "my-container-rg"
+      registry_dev: "myregistry.azurecr.io"
+      registry_stg: "myregistry.azurecr.io"
+      registry_prod: "myregistry.azurecr.io"
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}

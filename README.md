@@ -12,7 +12,26 @@ This workflow performs:
 - Push image to Azure Container Registry (ACR)
 - Deploy to Azure Container Apps with new revision
 
+### Security Scan Workflows
+
+#### Dependency Check
+**File:** `.github/workflows/dependency-check.yml`
+
+Scans dependencies for known security vulnerabilities using OWASP Dependency Check.
+
+#### Semgrep SAST Scan
+**File:** `.github/workflows/semgrep-scan.yml`
+
+Performs static application security testing (SAST) using Semgrep.
+
+#### Trivy Container Scan
+**File:** `.github/workflows/trivy-scan.yml`
+
+Scans Docker images for security vulnerabilities using Trivy.
+
 ## 🚀 Usage
+
+### Deploy to ACA
 
 ```yaml
 name: Deploy to ACA
@@ -35,7 +54,53 @@ jobs:
       AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 ```
 
+### Security Scans
+
+```yaml
+name: Security Scans
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'  # Weekly
+
+jobs:
+  dependency-check:
+    uses: lightnet/lightnet-ci-templates/.github/workflows/dependency-check.yml@main
+    with:
+      project_name: "MyProject"
+      scan_path: "./src"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  semgrep-scan:
+    uses: lightnet/lightnet-ci-templates/.github/workflows/semgrep-scan.yml@main
+    with:
+      project_name: "MyProject"
+      semgrep_config: "p/owasp-top-ten"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  trivy-scan:
+    uses: lightnet/lightnet-ci-templates/.github/workflows/trivy-scan.yml@main
+    with:
+      project_name: "MyProject"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+```
+
 ## 📝 Parameters
+
+### Build & Deploy Parameters
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
@@ -46,11 +111,33 @@ jobs:
 | `registry_prod` | ✅ | ACR name for PROD environment |
 | `custom_tag` | ❌ | Custom tag (e.g. hotfix-001) |
 
+### Security Scan Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `project_name` | ✅ | - | Project name for DefectDojo |
+| `scan_path` | ❌ | `./` | Path to scan (dependency-check) |
+| `semgrep_config` | ❌ | `p/owasp-top-ten` | Semgrep ruleset |
+
+| `dockerfile_path` | ❌ | `./Dockerfile` | Path to Dockerfile |
+| `dojo_url` | ❌ | `https://dojo.devfocus.site/` | DefectDojo URL |
+| `product_type` | ❌ | `Web Application` | DefectDojo product type |
+
 ## 🔐 Secrets
+
+### Build & Deploy Secrets
 
 | Secret | Required | Description |
 |--------|----------|-------------|
 | `AZURE_CREDENTIALS` | ✅ | Azure service principal credentials |
+
+### Security Scan Secrets
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `DOJO_USERNAME` | ✅ | DefectDojo username |
+| `DOJO_PASSWORD` | ✅ | DefectDojo password |
+| `DEFECTDOJO_API_KEY` | ❌ | DefectDojo API key (Semgrep only) |
 
 ## 🌍 Environment Mapping
 
@@ -83,7 +170,12 @@ versioning:
 
 ## 📁 Examples
 
-Check the `examples/` directory for usage examples and configuration files.
+Check the `examples/` directory for usage examples:
+
+- `usage-aca.yml` - Basic ACA deployment
+- `security-scans.yml` - Security scans only
+- `complete-pipeline.yml` - Full CI/CD with security + deploy
+- `pr-security-only.yml` - PR security checks only
 
 ## 📞 Support
 

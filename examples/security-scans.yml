@@ -1,0 +1,40 @@
+name: Security Scans via Templates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'  # Weekly Monday 3AM UTC
+
+jobs:
+  dependency-check:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/dependency-check.yml@main
+    with:
+      project_name: "iRemitAdmin"
+      scan_path: "./IRemitXAdmin"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  semgrep-scan:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/semgrep-scan.yml@main
+    with:
+      project_name: "iRemitAdmin"
+      semgrep_config: "p/owasp-top-ten"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  trivy-scan:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/trivy-scan.yml@main
+    with:
+      project_name: "iRemitAdmin"
+      dockerfile_path: "./Dockerfile"
+      product_type: "Web Application"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}

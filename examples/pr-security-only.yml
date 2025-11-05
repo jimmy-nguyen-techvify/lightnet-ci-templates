@@ -1,0 +1,23 @@
+name: PR Security Checks Only
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Only run security scans on PRs, no deployment
+  dependency-check:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/dependency-check.yml@main
+    with:
+      project_name: "MyApp"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
+
+  semgrep-scan:
+    uses: jimmy-nguyen-techvify/lightnet-ci-templates/.github/workflows/semgrep-scan.yml@main
+    with:
+      project_name: "MyApp"
+    secrets:
+      DOJO_USERNAME: ${{ secrets.DOJO_USERNAME }}
+      DOJO_PASSWORD: ${{ secrets.DOJO_PASSWORD }}
